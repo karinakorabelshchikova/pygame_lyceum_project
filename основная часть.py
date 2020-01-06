@@ -40,32 +40,75 @@ def start_menu():
     screen.blit(load_image('менюзаставка.png'), (0, 0))
     screen.blit(load_image('менюфон.png', -1), (0, 0))
 
-    menu_buttons_sprites = pygame.sprite.Group()
-    new_game_button = pygame.sprite.Sprite(menu_buttons_sprites)
+    menu_sprites = pygame.sprite.Group()
+
+    new_game_button = pygame.sprite.Sprite(menu_sprites)
     new_game_button.image = load_image('новаяигракнопка.png', -1)
     new_game_button.rect = new_game_button.image.get_rect()
     new_game_button.rect.x = 200
     new_game_button.rect.y = 190
-    load_game_button = pygame.sprite.Sprite(menu_buttons_sprites)
+
+    load_game_button = pygame.sprite.Sprite(menu_sprites)
     load_game_button.image = load_image('загрузитьигрукнопка.png', -1)
     load_game_button.rect = load_game_button.image.get_rect()
     load_game_button.rect.x = 200
     load_game_button.rect.y = 260
-    menu_buttons_sprites.draw(screen)
+
+    music_icon = pygame.sprite.Sprite(menu_sprites)
+    music_icon.image = load_image('музыкаиконка.png', -1)
+    music_icon.rect = load_game_button.image.get_rect()
+    music_icon.rect.x = 260
+    music_icon.rect.y = 330
+
+    music_plus_button = pygame.sprite.Sprite(menu_sprites)
+    music_plus_button.image = load_image('плюскнопка.png', -1)
+    music_plus_button.rect = pygame.Rect(230, 355, 40, 40)
+
+
+    music_minus_button = pygame.sprite.Sprite(menu_sprites)
+    music_minus_button.image = load_image('минускнопка.png', -1)
+    music_minus_button.rect = pygame.Rect(345, 355, 40, 40)
+
+    sound_icon = pygame.sprite.Sprite(menu_sprites)
+    sound_icon.image = load_image('звукиконка.png', -1)
+    sound_icon.rect = load_game_button.image.get_rect()
+    sound_icon.rect.x = 520
+    sound_icon.rect.y = 330
+
+    sound_plus_button = pygame.sprite.Sprite(menu_sprites)
+    sound_plus_button.image = load_image('плюскнопка.png', -1)
+    sound_plus_button.rect = pygame.Rect(485, 355, 40, 40)
+
+    sound_minus_button = pygame.sprite.Sprite(menu_sprites)
+    sound_minus_button.image = load_image('минускнопка.png')
+    sound_minus_button.rect = pygame.Rect(610, 355, 40, 40)
+
+    menu_sprites.draw(screen)
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 terminate()
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                pygame.mixer.music.fadeout(500)
-                return  # начинаем игру
+                if new_game_button.rect.collidepoint(event.pos):
+                    pygame.mixer.music.fadeout(700)
+                    return  # начинаем игру
+                elif load_game_button.rect.collidepoint(event.pos):
+                    pygame.mixer.music.fadeout(700)
+                    return  # начинаем игру
+                elif music_plus_button.rect.collidepoint(event.pos):
+                    print('m+')
+                elif music_minus_button.rect.collidepoint(event.pos):
+                    print('m-')
+                elif sound_plus_button.rect.collidepoint(event.pos):
+                    print('s+')
+                elif sound_minus_button.rect.collidepoint(event.pos):
+                    print('s-')
         pygame.display.flip()
-        menu_buttons_sprites.draw(screen)
+        menu_sprites.draw(screen)
         clock.tick(FPS)
 
 
 start_menu()
-print(1)
 running = True
 while running:
     for event in pygame.event.get():
