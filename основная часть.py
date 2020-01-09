@@ -23,6 +23,11 @@ def terminate():
     sys.exit()
 
 
+def kill_sprite_group(group):
+    for sprite in group:
+        sprite.kill()
+
+
 class Game:
     def __init__(self):
         self.MUSIC_MENU_FILE_NAME = 'ChadCrouch_TheChorusCeases.mp3'
@@ -122,6 +127,7 @@ class Game:
                             reader = csv.reader(file, delimiter=';')
                             self.load_game(reader)
                             pygame.mixer.music.fadeout(700)
+                            kill_sprite_group(buttons.menu_sprites)
                             return  # начинаем игру
                     elif buttons.load_game_button.rect.collidepoint(event.pos):
                         self.sound.play()
@@ -134,6 +140,7 @@ class Game:
                                 reader = csv.reader(file, delimiter=';')
                                 self.load_game(reader)
                                 pygame.mixer.music.fadeout(700)
+                                kill_sprite_group(buttons.menu_sprites)
                                 return  # начинаем игру
                         except Exception:
                             pass
@@ -212,9 +219,7 @@ class Game:
                         if self.pause_button.rect.collidepoint(event.pos):
                             self.sound.play()
                             self.paused = False
-                            for _ in self.buttons.menu_sprites:
-                                _.kill()
-                            del self.buttons
+                            kill_sprite_group(self.buttons.menu_sprites)
                 else:
                     if event.type == pygame.MOUSEBUTTONDOWN:
                         if self.pause_button.rect.collidepoint(event.pos):
