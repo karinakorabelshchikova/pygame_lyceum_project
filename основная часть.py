@@ -7,6 +7,8 @@ import csv
 
 
 def load_image(name, colorkey=None):
+    """Функция для загрузки изображений из папки data,
+    colorkey=-1 делает места цвета как в позиции (0, 0) прозрачными"""
     fullname = os.path.join('data', name)
     image = pygame.image.load(fullname).convert()
     if colorkey is not None:
@@ -19,16 +21,19 @@ def load_image(name, colorkey=None):
 
 
 def terminate():
+    """Функция отвечает за закрытие программы"""
     pygame.quit()
     sys.exit()
 
 
 def kill_sprite_group(group):
+    """Удаляет все спрайты, находящиеся в данной группе"""
     for sprite in group:
         sprite.kill()
 
 
 class Game:
+    """Главный класс игры"""
     def __init__(self):
         self.MUSIC_MENU_FILE_NAME = 'ChadCrouch_TheChorusCeases.mp3'
         self.MUSIC_MAIN_FILE_NAME = 'ChadCrouch_TheLight-filteringCanopy.mp3'
@@ -42,12 +47,14 @@ class Game:
         self.music_volume = 1
         self.sound_volume = 1
 
+        # sound - звук нажатой кнопки
         self.sound = pygame.mixer.Sound('data/buttonclicked.wav')
 
         self.start_menu()
         self.main_cycle()
 
     class menu_buttons:
+        """Класс, отвечающий за спрайты-кнопки в стартовом и внутриигровом меню"""
         def __init__(self, screen, is_start_menu=True):
             self.menu_sprites = pygame.sprite.Group()
 
@@ -101,15 +108,38 @@ class Game:
 
             self.menu_sprites.draw(screen)
 
-    class Camera:
-        pass
+        def change_volume_probably_pressed(self, game_object, pos):
+            """Функция принимает на вход game_object - объект своего родительского класса и координаты нажатия.
+            В случае нажатия на одну из кнопок регулирует громкость"""
+            if self.music_plus_button.rect.collidepoint(pos):
+                game_object.sound.play()
+                game_object.music_volume += 0.1
+                pygame.mixer.music.set_volume(game_object.music_volume)
 
-    class Hero(pygame.sprite.Sprite):
-        def __init__(self, *sprite_groups):
-            super().__init__(*sprite_groups)
+            elif self.music_minus_button.rect.collidepoint(pos):
+                game_object.sound.play()
+                game_object.music_volume -= 0.1
+                pygame.mixer.music.set_volume(game_object.music_volume)
+                if game_object.music_volume < 0.1:
+                    game_object.music_volume = 0
+                    pygame.mixer.music.set_volume(0)
+
+            elif self.sound_plus_button.rect.collidepoint(pos):
+                game_object.sound.play()
+                game_object.sound_volume += 0.1
+                game_object.sound.set_volume(game_object.sound_volume)
+
+            elif self.sound_minus_button.rect.collidepoint(pos):
+                game_object.sound.play()
+                game_object.sound_volume -= 0.1
+                game_object.sound.set_volume(game_object.sound_volume)
+                if game_object.sound_volume < 0.1:
+                    game_object.sound_volume = 0
+                    game_object.sound.set_volume(0)
 
     def start_menu(self):
         pygame.display.set_caption('Мистер герой')
+        pygame.display.set_icon(load_image('иконкаокна.png', -1))
         pygame.mixer.music.load('data/' + self.MUSIC_MENU_FILE_NAME)
         pygame.mixer.music.play(loops=-1)
         self.screen.blit(load_image('менюзаставка.png'), (0, 0))
@@ -144,40 +174,20 @@ class Game:
                                 return  # начинаем игру
                         except Exception:
                             pass
-                    elif buttons.music_plus_button.rect.collidepoint(event.pos):
-                        self.sound.play()
-                        self.music_volume += 0.1
-                        pygame.mixer.music.set_volume(self.music_volume)
-                    elif buttons.music_minus_button.rect.collidepoint(event.pos):
-                        self.sound.play()
-                        self.music_volume -= 0.1
-                        pygame.mixer.music.set_volume(self.music_volume)
-                        if self.music_volume < 0.1:
-                            self.music_volume = 0
-                            pygame.mixer.music.set_volume(0)
-                    elif buttons.sound_plus_button.rect.collidepoint(event.pos):
-                        self.sound.play()
-                        self.sound_volume += 0.1
-                        self.sound.set_volume(self.sound_volume)
-                    elif buttons.sound_minus_button.rect.collidepoint(event.pos):
-                        self.sound.play()
-                        self.sound_volume -= 0.1
-                        self.sound.set_volume(self.sound_volume)
-                        if self.sound_volume < 0.1:
-                            self.sound_volume = 0
-                            self.sound.set_volume(0)
+                    buttons.change_volume_probably_pressed(self, event.pos)
 
     def new_game(self, reader):
         self.level_number = 1
         self.get_level()
+        self.all_sprites = pygame.sprite.Group()
         self.get_changeable(reader)
-        self.hero = self.Hero()
 
     def load_game(self, reader):
         self.music_volume, self.sound_volume = next(reader)
         self.music_volume, self.sound_volume = float(self.music_volume[1:]), float(self.sound_volume)
         self.level_number = int(next(reader)[0])
         self.get_level()
+        self.all_sprites = pygame.sprite.Group()
         self.get_changeable(reader)
 
     def save_game(self, path):
@@ -187,11 +197,40 @@ class Game:
         if self.level_number == 1:
             pass
 
-    def level_update(self):
-        pass
+    class Hero(pygame.sprite.Sprite):
+        def __init__(self, position, health, special_groups=(), *groups):
+            super().__init__(*special_groups, *groups)
+            self.health = health
+            self.health_sprite = self.Health(*groups)
+
+        class Health(pygame.sprite.Sprite):
+            def __init__(self, percent, *groups):
+                super().__init__(*groups)
+
+        def move(self, doing):
+            pass
+
+        def update(self):
+            pass
+
+    class background(pygame.sprite.Sprite):
+        def __init__(self, layers):
+            super().__init__()
+
+    class Camera(pygame.sprite.Sprite):
+        def __init__(self, parent):
+            super().__init__()
+            self.game = parent
+
+        def update(self):
+            pass
 
     def get_changeable(self, reader):
-        pass
+        if self.level_number == 1:
+            self.hero = eval(next(reader)[0])
+            self.all_sprites.add(self.hero)
+        print(self.all_sprites)
+        print(self.hero.health)
 
     def main_cycle(self):
         pygame.mixer.music.load('data/' + self.MUSIC_MAIN_FILE_NAME)
@@ -207,7 +246,7 @@ class Game:
         self.pause_button_group.draw(self.screen)
 
         self.paused = False
-        self.camera = self.Camera()
+        self.camera = self.Camera(self)
 
         running = True
         while running:
@@ -220,6 +259,8 @@ class Game:
                             self.sound.play()
                             self.paused = False
                             kill_sprite_group(self.buttons.menu_sprites)
+                        else:
+                            self.buttons.change_volume_probably_pressed(self, event.pos)
                 else:
                     if event.type == pygame.MOUSEBUTTONDOWN:
                         if self.pause_button.rect.collidepoint(event.pos):
