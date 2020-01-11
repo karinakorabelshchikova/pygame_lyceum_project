@@ -79,27 +79,27 @@ class Game:
                 self.save_game_button.rect.y = 190
 
             self.music_icon = pygame.sprite.Sprite(self.menu_sprites)
-            self.music_icon.image = load_image('музыкаиконка.png', -1)
+            self.music_icon.image = load_image('музыкаиконка.png')
             self.music_icon.rect = self.music_icon.image.get_rect()
             self.music_icon.rect.x = 260
             self.music_icon.rect.y = 330
 
             self.music_plus_button = pygame.sprite.Sprite(self.menu_sprites)
-            self.music_plus_button.image = load_image('плюскнопка.png', -1)
+            self.music_plus_button.image = load_image('плюскнопка.png')
             self.music_plus_button.rect = pygame.Rect(230, 355, 40, 40)
 
             self.music_minus_button = pygame.sprite.Sprite(self.menu_sprites)
-            self.music_minus_button.image = load_image('минускнопка.png', -1)
+            self.music_minus_button.image = load_image('минускнопка.png')
             self.music_minus_button.rect = pygame.Rect(345, 355, 40, 40)
 
             self.sound_icon = pygame.sprite.Sprite(self.menu_sprites)
-            self.sound_icon.image = load_image('звукиконка.png', -1)
+            self.sound_icon.image = load_image('звукиконка.png')
             self.sound_icon.rect = self.sound_icon.image.get_rect()
             self.sound_icon.rect.x = 520
             self.sound_icon.rect.y = 330
 
             self.sound_plus_button = pygame.sprite.Sprite(self.menu_sprites)
-            self.sound_plus_button.image = load_image('плюскнопка.png', -1)
+            self.sound_plus_button.image = load_image('плюскнопка.png')
             self.sound_plus_button.rect = pygame.Rect(485, 355, 40, 40)
 
             self.sound_minus_button = pygame.sprite.Sprite(self.menu_sprites)
@@ -177,41 +177,61 @@ class Game:
                     buttons.change_volume_probably_pressed(self, event.pos)
 
     def new_game(self, reader):
-        self.level_number = 1
-        self.get_level()
-        self.all_sprites = pygame.sprite.Group()
-        self.get_changeable(reader)
+        self.level = self.Level(self, int(next(reader)[0]), reader)
 
     def load_game(self, reader):
         self.music_volume, self.sound_volume = next(reader)
         self.music_volume, self.sound_volume = float(self.music_volume[1:]), float(self.sound_volume)
-        self.level_number = int(next(reader)[0])
-        self.get_level()
-        self.all_sprites = pygame.sprite.Group()
-        self.get_changeable(reader)
+        self.level = self.Level(self, int(next(reader)[0]), reader)
 
     def save_game(self, path):
         pass
 
-    def get_level(self):
-        if self.level_number == 1:
-            pass
+    class Level:
+        def __init__(self, parent, level_number, reader):
+            self.game = parent
+            self.all_sprites = pygame.sprite.Group()
+            self.camera = parent.Camera(self)
+            self.level_number = level_number
+            if self.level_number == 1:
+                self.hero = eval(next(reader)[0])
+                self.all_sprites.add(self.hero)
 
     class Hero(pygame.sprite.Sprite):
-        def __init__(self, position, health, special_groups=(), *groups):
+        def __init__(self, level, position, health, special_groups=(), *groups):
             super().__init__(*special_groups, *groups)
+            self.level = level
             self.health = health
-            self.health_sprite = self.Health(*groups)
+            self.health_sprite = self.Health(health, *groups)
+            self.V = 20
+            self.rect = pygame.Rect(position[0], position[1], 18, 110)
+            self.clock = pygame.time.Clock()
+            self.waiting = 0
+            self.standing_frame = load_image('геройстоитфрейм.png', -1)
+            self.walk_frames = [load_image('геройходьбафрейм2.png', -1),
+                           load_image('геройходьбафрейм3.png', -1),
+                           load_image('геройходьбафрейм2.png', -1)]
+            self.image = self.standing_frame
+            self.walk_frames_left = 0
+            self.direction = None
 
         class Health(pygame.sprite.Sprite):
             def __init__(self, percent, *groups):
                 super().__init__(*groups)
 
-        def move(self, doing):
-            pass
+        def move_command(self, doing):
+            if doing == 'right' or doing == 'left':
+                self.walk_frames_left = 3
+                self.direction = doing
 
         def update(self):
-            pass
+            self.clock.tick(self.V)
+            if self.walk_frames_left:
+                self.image = self.walk_frames[-self.walk_frames_left]
+                self.walk_frames_left -= 1
+                self.rect.x += 10 if self.direction == 'right' else -10
+            else:
+                self.image = self.standing_frame
 
     class background(pygame.sprite.Sprite):
         def __init__(self, layers):
@@ -220,33 +240,23 @@ class Game:
     class Camera(pygame.sprite.Sprite):
         def __init__(self, parent):
             super().__init__()
-            self.game = parent
+            self.level = parent
 
         def update(self):
             pass
-
-    def get_changeable(self, reader):
-        if self.level_number == 1:
-            self.hero = eval(next(reader)[0])
-            self.all_sprites.add(self.hero)
-        print(self.all_sprites)
-        print(self.hero.health)
 
     def main_cycle(self):
         pygame.mixer.music.load('data/' + self.MUSIC_MAIN_FILE_NAME)
         pygame.mixer.music.play(loops=-1)
 
-        # delete later
-        self.screen.fill(pygame.color.Color('black'))
-
         self.pause_button_group = pygame.sprite.GroupSingle()
-        self.pause_button = pygame.sprite.Sprite(self.pause_button_group)
+        self.pause_button = pygame.sprite.Sprite(self.level.all_sprites, self.pause_button_group)
         self.pause_button.image = load_image('паузакнопка.png', -1)
         self.pause_button.rect = pygame.Rect(830, 10, 60, 60)
         self.pause_button_group.draw(self.screen)
 
         self.paused = False
-        self.camera = self.Camera(self)
+        self.time_passed = 0
 
         running = True
         while running:
@@ -270,19 +280,22 @@ class Game:
                         else:
                             # attack
                             pass
-                    elif event.type == pygame.K_a:
-                        self.hero.move('left')
-                    elif event.type == pygame.K_w:
-                        self.hero.move('up')
-                    elif event.type == pygame.K_d:
-                        self.hero.move('right')
-                    elif event.type == pygame.K_w:
-                        self.hero.move('down')
-                    elif event.type == pygame.K_q:
-                        self.hero.move('action')
-                    self.all_sprites.update()
-                    self.camera.update()
-            self.clock.tick(self.FPS)
+                    elif event.type == pygame.KEYDOWN:
+                        if event.scancode == 16:
+                            self.level.hero.move_command('action')
+                        elif event.scancode == 17:
+                            self.level.hero.move_command('up')
+                        elif event.scancode == 30:
+                            self.level.hero.move_command('left')
+                        elif event.scancode == 31:
+                            self.level.hero.move_command('down')
+                        elif event.scancode == 32:
+                            self.level.hero.move_command('right')
+            if not self.paused:
+                self.screen.blit(load_image('уровень1фон(арки интерьерверх).png'), (0, 0))
+                self.level.all_sprites.update()
+                self.level.camera.update()
+                self.level.all_sprites.draw(self.screen)
             pygame.display.flip()
 
 
