@@ -200,38 +200,57 @@ class Game:
     class Hero(pygame.sprite.Sprite):
         def __init__(self, level, position, health, special_groups=(), *groups):
             super().__init__(*special_groups, *groups)
-            self.level = level
-            self.health = health
-            self.health_sprite = self.Health(health, *groups)
-            self.V = 20
+            self.level = level  # уровень, к которому привязан герой
+            self.health = health  # оставшееся здоровье в процентах
+            self.health_sprite = self.Health(health, *groups)  # соответствующий спрайт
+            self.Vmax = 20  # оставшееся здоровье в процентах
             self.rect = pygame.Rect(position[0], position[1], 18, 110)
             self.clock = pygame.time.Clock()
-            self.waiting = 0
+            self.waiting = 0  # суммирует время от clock.tick
             self.standing_frame = load_image('геройстоитфрейм.png', -1)
-            self.walk_frames = [load_image('геройходьбафрейм2.png', -1),
-                           load_image('геройходьбафрейм3.png', -1),
-                           load_image('геройходьбафрейм2.png', -1)]
+            self.walk_frames = [load_image('геройходьбафрейм1.png', -1),
+                                load_image('геройходьбафрейм2.png', -1),
+                                load_image('геройходьбафрейм1.png', -1)]
             self.image = self.standing_frame
             self.walk_frames_left = 0
-            self.direction = None
+            self.direction = None  # Отвечает за направление падения и ходьбы
+            self.Vy = None  # Вертикальная роекция скорости, нужна для падений и прыжков
 
         class Health(pygame.sprite.Sprite):
             def __init__(self, percent, *groups):
                 super().__init__(*groups)
 
         def move_command(self, doing):
-            if doing == 'right' or doing == 'left':
-                self.walk_frames_left = 3
-                self.direction = doing
+            if self.Vy is None:
+                if doing == 'right' or doing == 'left':
+                    self.walk_frames_left = 3
+                    self.direction = doing
+                elif doing == 'up':
+                    self.Vy = 40
 
         def update(self):
-            self.clock.tick(self.V)
-            if self.walk_frames_left:
+            self.clock.tick(self.Vmax)
+            if self.Vy is not None:
+                if self.Vy <= -50:  # заменить на is_touching_platform()
+                    self.direction = None
+                    self.Vy = None
+                    self.walk_frames_left = 0
+                else:
+                    if self.direction == 'right':
+                        self.rect.x += 10
+                    elif self.direction == 'left':
+                        self.rect.x -= 10
+                    self.rect.y -= self.Vy
+                    self.Vy -= 10
+            elif False:  # Тут будет проверка, не пора ли падать
+                pass  #  И соответствующие действия
+            elif self.walk_frames_left:
                 self.image = self.walk_frames[-self.walk_frames_left]
                 self.walk_frames_left -= 1
                 self.rect.x += 10 if self.direction == 'right' else -10
             else:
                 self.image = self.standing_frame
+                self.direction = None
 
     class background(pygame.sprite.Sprite):
         def __init__(self, layers):
