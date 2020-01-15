@@ -1,3 +1,4 @@
 ﻿0.5;0.5
 1
-parent.Hero(self, (100, 340), 100, self.all_sprites)
+parent.Background('уровень1фон(арки интерьерверх).png', (0, 0))
+parent.Hero(self, (100, 340), 100)

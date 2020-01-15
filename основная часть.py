@@ -26,12 +26,6 @@ def terminate():
     sys.exit()
 
 
-def kill_sprite_group(group):
-    """Удаляет все спрайты, находящиеся в данной группе"""
-    for sprite in group:
-        sprite.kill()
-
-
 class Game:
     """Главный класс игры"""
     def __init__(self):
@@ -157,7 +151,7 @@ class Game:
                             reader = csv.reader(file, delimiter=';')
                             self.load_game(reader)
                             pygame.mixer.music.fadeout(700)
-                            kill_sprite_group(buttons.menu_sprites)
+                            buttons.menu_sprites.empty()
                             return  # начинаем игру
                     elif buttons.load_game_button.rect.collidepoint(event.pos):
                         self.sound.play()
@@ -170,7 +164,7 @@ class Game:
                                 reader = csv.reader(file, delimiter=';')
                                 self.load_game(reader)
                                 pygame.mixer.music.fadeout(700)
-                                kill_sprite_group(buttons.menu_sprites)
+                                buttons.menu_sprites.empty()
                                 return  # начинаем игру
                         except Exception:
                             pass
@@ -191,15 +185,21 @@ class Game:
         def __init__(self, parent, level_number, reader):
             self.game = parent
             self.all_sprites = pygame.sprite.Group()
+            self.platform_group = pygame.sprite.Group()
             self.camera = parent.Camera(self)
             self.level_number = level_number
             if self.level_number == 1:
+                self.background = eval(next(reader)[0])
                 self.hero = eval(next(reader)[0])
-                self.all_sprites.add(self.hero)
+                self.all_sprites.add(self.background, self.hero)
+
+        def update(self, *args, **kwargs):
+            if self.level_number == 1:
+                pass
 
     class Hero(pygame.sprite.Sprite):
-        def __init__(self, level, position, health, special_groups=(), *groups):
-            super().__init__(*special_groups, *groups)
+        def __init__(self, level, position, health, groups=(), special_groups=()):
+            super().__init__(*groups, special_groups)
             self.level = level  # уровень, к которому привязан герой
             self.health = health  # оставшееся здоровье в процентах
             self.health_sprite = self.Health(health, *groups)  # соответствующий спрайт
@@ -214,7 +214,9 @@ class Game:
             self.image = self.standing_frame
             self.walk_frames_left = 0
             self.direction = None  # Отвечает за направление падения и ходьбы
-            self.Vy = None  # Вертикальная роекция скорости, нужна для падений и прыжков
+            # Используется камерой для сдвига героя либо фона
+            self.moved_x = self.moved_y = 0
+            self.Vy = None  # Вертикальная проекция скорости, нужна для падений и прыжков
 
         class Health(pygame.sprite.Sprite):
             def __init__(self, percent, *groups):
@@ -229,53 +231,84 @@ class Game:
                     self.Vy = 40
 
         def update(self):
-            self.clock.tick(self.Vmax)
-            if self.Vy is not None:
-                if self.Vy <= -50:  # заменить на is_touching_platform()
-                    self.direction = None
-                    self.Vy = None
-                    self.walk_frames_left = 0
+            self.waiting += self.clock.tick(self.Vmax)
+            if self.waiting >= 0.1:
+                self.waiting = 0
+                if self.Vy is not None:
+                    if self.Vy <= -50:  # заменить на is_touching_platform()
+                        self.direction = None
+                        self.Vy = None
+                        self.walk_frames_left = 0
+                    else:
+                        if self.direction == 'right':
+                            self.moved_x += 10
+                        elif self.direction == 'left':
+                            self.moved_x -= 10
+                        self.moved_y -= self.Vy
+                        self.Vy -= 10
+                elif False:  # Тут будет проверка, не пора ли падать
+                    pass  #  И соответствующие действия
+                elif self.walk_frames_left:
+                    self.image = self.walk_frames[-self.walk_frames_left]
+                    self.walk_frames_left -= 1
+                    self.moved_x += 10 if self.direction == 'right' else -10
                 else:
-                    if self.direction == 'right':
-                        self.rect.x += 10
-                    elif self.direction == 'left':
-                        self.rect.x -= 10
-                    self.rect.y -= self.Vy
-                    self.Vy -= 10
-            elif False:  # Тут будет проверка, не пора ли падать
-                pass  #  И соответствующие действия
-            elif self.walk_frames_left:
-                self.image = self.walk_frames[-self.walk_frames_left]
-                self.walk_frames_left -= 1
-                self.rect.x += 10 if self.direction == 'right' else -10
-            else:
-                self.image = self.standing_frame
-                self.direction = None
+                    self.image = self.standing_frame
+                    self.direction = None
 
-    class background(pygame.sprite.Sprite):
-        def __init__(self, layers):
-            super().__init__()
+    class Background(pygame.sprite.Sprite):
+        def __init__(self, image, position, groups=()):
+            super().__init__(*groups)
+            self.image = load_image(image)
+            self.rect = self.image.get_rect()
+            self.rect.x, self.rect.y = position
+            self.image = load_image(image)
 
     class Camera(pygame.sprite.Sprite):
         def __init__(self, parent):
             super().__init__()
             self.level = parent
 
+        def is_hero_near_left_or_right_board(self):
+            if 0 <= self.level.background.rect.right - self.level.hero.rect.centerx <= 450 \
+               or 0 <= self.level.hero.rect.centerx - self.level.background.rect.x <= 450:
+                return True
+
+        def is_hero_near_upper_or_bottom_board(self):
+            if 0 <= self.level.hero.rect.centery - self.level.background.rect.y <= 250 \
+               or 0 <= self.level.background.rect.bottom - self.level.hero.rect.centery <= 250:
+                return True
+
         def update(self):
-            pass
+            if self.is_hero_near_left_or_right_board():
+                self.level.hero.rect.x += self.level.hero.moved_x
+            else:
+                for sprite in self.level.all_sprites:
+                    if sprite != self.level.hero:
+                        sprite.rect.x -= self.level.hero.moved_x
+            if self.is_hero_near_upper_or_bottom_board():
+                self.level.hero.rect.y += self.level.hero.moved_y
+            else:
+                for sprite in self.level.all_sprites:
+                    if sprite != self.level.hero:
+                        sprite.rect.y -= self.level.hero.moved_y
+            self.level.hero.moved_x = 0
+            self.level.hero.moved_y = 0
+
+    class Border(pygame.sprite.Sprite):
+        def __init__(self, x, y, lenth, groups, passable=True, vertical=False):
+            super().__init__(*groups)
 
     def main_cycle(self):
         pygame.mixer.music.load('data/' + self.MUSIC_MAIN_FILE_NAME)
         pygame.mixer.music.play(loops=-1)
 
         self.pause_button_group = pygame.sprite.GroupSingle()
-        self.pause_button = pygame.sprite.Sprite(self.level.all_sprites, self.pause_button_group)
+        self.pause_button = pygame.sprite.Sprite(self.pause_button_group)
         self.pause_button.image = load_image('паузакнопка.png', -1)
         self.pause_button.rect = pygame.Rect(830, 10, 60, 60)
-        self.pause_button_group.draw(self.screen)
 
         self.paused = False
-        self.time_passed = 0
 
         running = True
         while running:
@@ -287,7 +320,7 @@ class Game:
                         if self.pause_button.rect.collidepoint(event.pos):
                             self.sound.play()
                             self.paused = False
-                            kill_sprite_group(self.buttons.menu_sprites)
+                            self.buttons.menu_sprites.empty()
                         else:
                             self.buttons.change_volume_probably_pressed(self, event.pos)
                 else:
@@ -311,10 +344,11 @@ class Game:
                         elif event.scancode == 32:
                             self.level.hero.move_command('right')
             if not self.paused:
-                self.screen.blit(load_image('уровень1фон(арки интерьерверх).png'), (0, 0))
                 self.level.all_sprites.update()
                 self.level.camera.update()
+                self.level.update()
                 self.level.all_sprites.draw(self.screen)
+                self.pause_button_group.draw(self.screen)
             pygame.display.flip()
 
 
