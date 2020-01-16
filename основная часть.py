@@ -186,16 +186,59 @@ class Game:
             self.game = parent
             self.all_sprites = pygame.sprite.Group()
             self.platform_group = pygame.sprite.Group()
+            self.door_group = pygame.sprite.Group()
             self.camera = parent.Camera(self)
             self.level_number = level_number
             if self.level_number == 1:
-                self.background = eval(next(reader)[0])
+                self.backgrounds = [load_image('уровень1фон(арки фасад).png'),
+                                    load_image('уровень1фон(арки интерьерверх).png'),
+                                    load_image('уровень1фон(арки интерьерниз).png')]
+                background_image = self.backgrounds[int(next(reader)[0])]
+                self.background = self.game.Background(background_image, (0, 0))
+                self.house_unlocked = bool(next(reader))
                 self.hero = eval(next(reader)[0])
-                self.all_sprites.add(self.background, self.hero)
+                self.ground = eval(next(reader)[0])
+                self.platform1 = eval(next(reader)[0])
+                self.platform2 = eval(next(reader)[0])
+                self.platform3 = eval(next(reader)[0])
+                self.platform4 = eval(next(reader)[0])
+                self.platform5 = eval(next(reader)[0])
+                self.door1 = pygame.sprite.Sprite()
+                self.door1.rect = eval(next(reader)[0])
+                self.door2 = pygame.sprite.Sprite()
+                self.door2.rect = eval(next(reader)[0])
+                self.door1.image = self.door2.image = load_image('специальнаякартинка.png', -1)
+                self.door_group.add(self.door1, self.door2)
+                self.platform_group.add(self.ground, self.platform1, self.platform2,
+                                        self.platform3, self.platform4, self.platform5)
+                self.all_sprites.add(self.background, self.hero, self.ground,
+                                     self.platform1, self.platform2, self.platform3,
+                                     self.platform4, self.platform5, self.door1,
+                                     self.door2)
+                shift = next(reader)
+                self.hero.moved_x, self.hero.moved_y = int(shift[0]), int(shift[1])
+                print(self.hero.moved_x, self.hero.moved_y)
+                self.camera.update()
+
+        def action_command(self):
+            position = self.hero.rect.center
+            if self.level_number == 1:
+                if self.door1.rect.collidepoint(position):
+                    self.house_unlocked = True
+                    self.hero.rect.x = 810
+                    self.hero.rect.y = 310
+                elif self.door2.rect.collidepoint(position) and self.house_unlocked:
+                    self.hero.rect.x = 810
+                    self.hero.rect.y = 110
 
         def update(self, *args, **kwargs):
             if self.level_number == 1:
-                pass
+                if self.background.rect.x <= -930 and self.hero.rect.y <= 120:
+                    self.background.image = self.backgrounds[1]
+                elif self.background.rect.x <= -930 and self.hero.rect.y > 120 and self.house_unlocked:
+                    self.background.image = self.backgrounds[2]
+                else:
+                    self.background.image = self.backgrounds[0]
 
     class Hero(pygame.sprite.Sprite):
         def __init__(self, level, position, health, groups=(), special_groups=()):
@@ -229,13 +272,45 @@ class Game:
                     self.direction = doing
                 elif doing == 'up':
                     self.Vy = 40
+                elif doing == 'down':
+                    platform = self.is_on_platform()
+                    if platform:
+                        if platform.passable:
+                            self.Vy = -10
+                            self.rect.y += 10
+
+        def will_touch_platform(self):
+            """Очень корявый способ определить, врежется ли герой в стену"""
+            if self.direction == 'right':
+                a = 10
+            elif self.direction == 'left':
+                a = -10
+            else:
+                a = 0
+            if self.Vy is None:
+                colliding_rect = pygame.sprite.Sprite()
+                colliding_rect.rect = pygame.rect.Rect(self.rect.x, self.rect.bottom, a, 1)
+                if pygame.sprite.spritecollide(colliding_rect, self.level.platform_group, False):
+                    return True
+            else:
+                colliding_rect = pygame.sprite.Sprite()
+                colliding_rect.rect = pygame.rect.Rect(self.rect.x, self.rect.bottom, a, -self.Vy)
+                if pygame.sprite.spritecollide(colliding_rect, self.level.platform_group, False):
+                    return True
+
+        def is_on_platform(self):
+            for platform in self.level.platform_group:
+                if platform.rect.x <= self.rect.centerx <= platform.rect.right \
+                        and platform.rect.top == self.rect.bottom:
+                    return platform
+            return False
 
         def update(self):
             self.waiting += self.clock.tick(self.Vmax)
             if self.waiting >= 0.1:
                 self.waiting = 0
                 if self.Vy is not None:
-                    if self.Vy <= -50:  # заменить на is_touching_platform()
+                    if self.will_touch_platform():
                         self.direction = None
                         self.Vy = None
                         self.walk_frames_left = 0
@@ -246,9 +321,9 @@ class Game:
                             self.moved_x -= 10
                         self.moved_y -= self.Vy
                         self.Vy -= 10
-                elif False:  # Тут будет проверка, не пора ли падать
-                    pass  #  И соответствующие действия
-                elif self.walk_frames_left:
+                elif not self.is_on_platform():  # проверка, не пора ли падать
+                    self.Vy = 0  # и собственно падение
+                elif self.walk_frames_left:  # Если ещё не доделали шаг - доделываем
                     self.image = self.walk_frames[-self.walk_frames_left]
                     self.walk_frames_left -= 1
                     self.moved_x += 10 if self.direction == 'right' else -10
@@ -259,10 +334,9 @@ class Game:
     class Background(pygame.sprite.Sprite):
         def __init__(self, image, position, groups=()):
             super().__init__(*groups)
-            self.image = load_image(image)
+            self.image = image
             self.rect = self.image.get_rect()
             self.rect.x, self.rect.y = position
-            self.image = load_image(image)
 
     class Camera(pygame.sprite.Sprite):
         def __init__(self, parent):
@@ -281,7 +355,9 @@ class Game:
 
         def update(self):
             if self.is_hero_near_left_or_right_board():
-                self.level.hero.rect.x += self.level.hero.moved_x
+                if self.level.background.rect.right - (self.level.hero.rect.right + self.level.hero.moved_x) > 0\
+                        and (self.level.hero.rect.x + self.level.hero.moved_x) - self.level.background.rect.x > 0:
+                    self.level.hero.rect.x += self.level.hero.moved_x
             else:
                 for sprite in self.level.all_sprites:
                     if sprite != self.level.hero:
@@ -296,8 +372,14 @@ class Game:
             self.level.hero.moved_y = 0
 
     class Border(pygame.sprite.Sprite):
-        def __init__(self, x, y, lenth, groups, passable=True, vertical=False):
+        def __init__(self, x, y, lenth, groups=(), passable=True, vertical=False):
             super().__init__(*groups)
+            self.passable = passable
+            self.image = load_image('специальнаякартинка.png', -1)
+            if vertical:
+                self.rect = pygame.rect.Rect(x, y, 1, lenth)
+            else:
+                self.rect = pygame.rect.Rect(x, y, lenth, 1)
 
     def main_cycle(self):
         pygame.mixer.music.load('data/' + self.MUSIC_MAIN_FILE_NAME)
@@ -330,11 +412,11 @@ class Game:
                             self.paused = True
                             self.buttons = self.menu_buttons(self.screen, is_start_menu=False)
                         else:
-                            # attack
+                            # атака, коя не реализованна
                             pass
                     elif event.type == pygame.KEYDOWN:
                         if event.scancode == 16:
-                            self.level.hero.move_command('action')
+                            self.level.action_command()
                         elif event.scancode == 17:
                             self.level.hero.move_command('up')
                         elif event.scancode == 30:

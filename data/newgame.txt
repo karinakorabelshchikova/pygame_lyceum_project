@@ -1,4 +1,14 @@
 ﻿0.5;0.5
 1
-parent.Background('уровень1фон(арки интерьерверх).png', (0, 0))
-parent.Hero(self, (100, 340), 100)
+0
+
+parent.Hero(self, (442, 310), 100)
+parent.Border(-1, 420, 1834, (), passable=False)
+parent.Border(260, 380, 60)
+parent.Border(260, 280, 60)
+parent.Border(350, 230, 1000)
+parent.Border(1320, 200, 50, passable=False)
+parent.Border(1310, 230, 500, passable=False)
+pygame.rect.Rect(1715, 110, 270, 115)
+pygame.rect.Rect(1715, 315, 270, 115)
+900;0
