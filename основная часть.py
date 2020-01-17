@@ -217,7 +217,6 @@ class Game:
                                      self.door2)
                 shift = next(reader)
                 self.hero.moved_x, self.hero.moved_y = int(shift[0]), int(shift[1])
-                print(self.hero.moved_x, self.hero.moved_y)
                 self.camera.update()
 
         def action_command(self):
